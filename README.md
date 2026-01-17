@@ -163,18 +163,18 @@ Create a `.env` file in the project root (use `.env.example` as template):
 
 ```env
 # PostgreSQL Configuration
-POSTGRES_USER=slack_user
-POSTGRES_PASSWORD=slack_password
-POSTGRES_DB=slack_db
-POSTGRES_PORT=5432
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_DB=
+POSTGRES_PORT=
 
 # pgAdmin Configuration
-PGADMIN_EMAIL=admin@slack.local
-PGADMIN_PASSWORD=admin
-PGADMIN_PORT=5050
+PGADMIN_EMAIL=
+PGADMIN_PASSWORD=
+PGADMIN_PORT=
 
 # Database Connection URL (for NestJS)
-DATABASE_URL=postgresql://slack_user:slack_password@localhost:5432/slack_db
+DATABASE_URL=postgresql://username:password@localhost:5432/dbname
 ```
 
 ## 💻 Development
@@ -204,11 +204,13 @@ npm run start:debug
 ### Development Workflow
 
 1. **Start the database:**
+
    ```bash
    docker-compose -f docker.compose.yml up -d
    ```
 
 2. **Run the application in watch mode:**
+
    ```bash
    npm run start:dev
    ```
@@ -272,6 +274,7 @@ server/
 ## 🤝 Support
 
 For questions and support:
+
 - Visit the [NestJS Discord channel](https://discord.gg/G7Qnnhy)
 - Check out [NestJS Enterprise Support](https://enterprise.nestjs.com)
 

@@ -10,6 +10,10 @@ async function bootstrap() {
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }));
 
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['/', '/docs', '/docs-json', '/favicon.ico', '/favicon.png'],
+  });
+
   console.log('[Nest] Building Swagger documentation...');
   const config = new DocumentBuilder()
     .setTitle('Slack API')

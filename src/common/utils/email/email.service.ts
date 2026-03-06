@@ -11,11 +11,14 @@ export class EmailService {
     // Initialize nodemailer transporter with ConfigService
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // true for 465, false for other ports
+      port: 465,
+      secure: true, // true for 465, false for other ports
       auth: {
-        user: this.configService.get<string>('EMAIL_USER'),
-        pass: this.configService.get<string>('EMAIL_PASS'),
+        user:
+          this.configService.get<string>('EMAIL_USER') ||
+          'clientandcontenthub@gmail.com',
+        pass:
+          this.configService.get<string>('EMAIL_PASS') || 'ocqo flaj sdvg cmyr',
       },
     });
   }

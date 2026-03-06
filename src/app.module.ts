@@ -15,10 +15,13 @@ import { WorkSpaceModule } from './modules/work-space/work-space.module';
 import { WebrtcModule } from './modules/webrtc/webrtc.module';
 import { UsersModule } from './modules/users/users.module';
 import { FriendsModule } from './modules/friends/friends.module';
+import { MessagesModule } from './modules/messages/messages.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    PrismaModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -42,6 +45,7 @@ import { FriendsModule } from './modules/friends/friends.module';
     WebrtcModule,
     UsersModule,
     FriendsModule,
+    MessagesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,15 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateFriendRequestDto } from './dto/create-friend-request.dto';
+import { SocketService } from '../webrtc/socket.service';
 
 @Injectable()
 export class FriendsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => SocketService))
+    private readonly socketService: SocketService,
+  ) {}
 
   async sendFriendRequest(
     currentUserId: string,
@@ -64,19 +71,29 @@ export class FriendsService {
 
       if (existingRequest.senderId === currentUserId) {
         // Resend if rejected previously
-        return this.prisma.friendRequest.update({
+        const updated = await this.prisma.friendRequest.update({
           where: { id: existingRequest.id },
           data: { status: 'PENDING' },
         });
+        this.socketService.emitToUser(receiverId, 'incoming-friend-request', {
+          senderId: currentUserId,
+        });
+        return updated;
       }
     }
 
-    return this.prisma.friendRequest.create({
+    const request = await this.prisma.friendRequest.create({
       data: {
         senderId: currentUserId,
         receiverId,
       },
     });
+
+    this.socketService.emitToUser(receiverId, 'incoming-friend-request', {
+      senderId: currentUserId,
+    });
+
+    return request;
   }
 
   async getPendingRequests(userId: string) {
@@ -140,7 +157,7 @@ export class FriendsService {
       );
     }
 
-    return this.prisma.$transaction(async (prisma) => {
+    const result = await this.prisma.$transaction(async (prisma) => {
       // Update request status
       const updatedRequest = await prisma.friendRequest.update({
         where: { id: requestId },
@@ -158,6 +175,12 @@ export class FriendsService {
 
       return updatedRequest;
     });
+
+    this.socketService.emitToUser(request.senderId, 'friend-request-accepted', {
+      receiverId: userId,
+    });
+
+    return result;
   }
 
   async rejectFriendRequest(userId: string, requestId: string) {
@@ -175,10 +198,16 @@ export class FriendsService {
       );
     }
 
-    return this.prisma.friendRequest.update({
+    const updated = await this.prisma.friendRequest.update({
       where: { id: requestId },
       data: { status: 'REJECTED' },
     });
+
+    this.socketService.emitToUser(request.senderId, 'friend-request-rejected', {
+      requestId,
+    });
+
+    return updated;
   }
 
   async cancelFriendRequest(userId: string, requestId: string) {
@@ -196,9 +225,19 @@ export class FriendsService {
       );
     }
 
-    return this.prisma.friendRequest.delete({
+    const deleted = await this.prisma.friendRequest.delete({
       where: { id: requestId },
     });
+
+    this.socketService.emitToUser(
+      request.receiverId,
+      'friend-request-canceled',
+      {
+        requestId,
+      },
+    );
+
+    return deleted;
   }
 
   async getFriendsList(userId: string) {
@@ -217,6 +256,53 @@ export class FriendsService {
       },
     });
 
-    return friendships.map((f) => f.friend);
+    const friendsWithLastMessage = await Promise.all(
+      friendships.map(async (f) => {
+        const friend = f.friend;
+        // Find DM channel between userId and friend.user_id
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            isDM: true,
+            channelMembers: {
+              every: {
+                user_id: { in: [userId, friend.user_id] },
+              },
+            },
+          },
+          include: {
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                content: true,
+                createdAt: true,
+                sender_id: true,
+              },
+            },
+            channelMembers: true,
+          },
+        });
+
+        // Ensure it's exactly 2 members
+        const validChannel =
+          channel?.channelMembers.length === 2 ? channel : null;
+
+        return {
+          ...friend,
+          lastMessage: validChannel?.messages[0] || null,
+        };
+      }),
+    );
+
+    // Sort by last message time if available, otherwise just return
+    return friendsWithLastMessage.sort((a, b) => {
+      const timeA = a.lastMessage
+        ? new Date(a.lastMessage.createdAt).getTime()
+        : 0;
+      const timeB = b.lastMessage
+        ? new Date(b.lastMessage.createdAt).getTime()
+        : 0;
+      return timeB - timeA;
+    });
   }
 }

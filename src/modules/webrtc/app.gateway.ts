@@ -3,12 +3,16 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { WebrtcService } from './webrtc.service';
+import { SocketService } from './socket.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { MessagesService } from '../messages/messages.service';
 import {
   CallResponseDto,
   IceCandidateDto,
@@ -16,22 +20,32 @@ import {
   SignalDto,
 } from './dto/webrtc.dto';
 
-const connectedUsers = new Map<string, string>(); // [userId, socketId]
 const roomUsers = new Map<string, string[]>(); // [roomId, [socketId1, socketId2]]
 const callTimeouts = new Map<string, NodeJS.Timeout>(); // [roomId, timeoutId]
-const activeRooms = new Map<string, any>(); // Added missing map
+const activeRooms = new Map<string, any>();
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
-  namespace: '/webrtc',
+  namespace: '/app',
 })
-export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AppGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
+{
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly webrtcService: WebrtcService) {}
+  constructor(
+    private readonly webrtcService: WebrtcService,
+    private readonly socketService: SocketService,
+    private readonly prisma: PrismaService,
+    private readonly messagesService: MessagesService,
+  ) {}
+
+  afterInit(server: Server) {
+    this.socketService.setServer(server);
+  }
 
   async handleConnection(client: Socket) {
     const userId = client.handshake?.query?.userId as string;
@@ -39,16 +53,35 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.disconnect();
       return;
     }
-    connectedUsers.set(userId, client.id);
-    console.log(`Client connected: ${client.id}`);
+    this.socketService.setCurrentUser(userId, client.id);
+    console.log(`Client connected: ${client.id} (User: ${userId})`);
+
+    // Update user status in DB
+    await this.prisma.user.update({
+      where: { user_id: userId },
+      data: { status: 'ONLINE' },
+    });
+
+    // Emit the current list of online users to everyone
+    this.server.emit('online-users', this.socketService.getConnectedUsers());
   }
 
   async handleDisconnect(client: Socket) {
-    const userId = Array.from(connectedUsers.entries()).find(
-      ([key, value]) => value === client.id,
-    )?.[0];
+    const userId = this.socketService
+      .getConnectedUsers()
+      .find((id) => this.socketService.getSocketId(id) === client.id);
+
     if (userId) {
-      connectedUsers.delete(userId);
+      this.socketService.removeCurrentUser(userId);
+
+      // Update user status in DB
+      await this.prisma.user.update({
+        where: { user_id: userId },
+        data: { status: 'OFFLINE' },
+      });
+
+      // Emit the updated list of online users to everyone
+      this.server.emit('online-users', this.socketService.getConnectedUsers());
     }
 
     for (const [roomId, participants] of roomUsers.entries()) {
@@ -74,43 +107,42 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client disconnected: ${client.id}`);
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PHASE 1: CALL INITIATION
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   @SubscribeMessage('initiate-call')
   async handleInitiateCall(
     @MessageBody() dto: InitiateCallDto,
     @ConnectedSocket() client: Socket,
   ) {
-    const callerId = [...connectedUsers.entries()].find(
-      ([, socketId]) => socketId === client.id,
-    )?.[0];
+    const callerId = this.socketService
+      .getConnectedUsers()
+      .find((id) => this.socketService.getSocketId(id) === client.id);
 
     if (!callerId) {
       client.emit('call-error', { message: 'Caller not found' });
       return;
     }
 
-    // Receiver online আছে কিনা check করো
-    const receiverSocketId = connectedUsers.get(dto.receiverId);
+    const receiverSocketId = this.socketService.getSocketId(dto.receiverId);
     if (!receiverSocketId) {
       client.emit('call-error', { message: 'User is offline' });
       return;
     }
 
-    // DB তে call তৈরি করো
     const call = await this.webrtcService.createCall(callerId, dto.receiverId);
 
-    // Caller কে roomId দাও
     client.emit('call-initiated', {
       roomId: call.roomId,
       receiver: call.receiver,
     });
 
-    // Receiver কে incoming call জানাও
     this.server.to(receiverSocketId).emit('incoming-call', {
       roomId: call.roomId,
       caller: call.caller,
     });
 
-    // ৩০ সেকেন্ড পর কেউ না ধরলে missed call
     const timeout = setTimeout(async () => {
       const room = activeRooms.get(call.roomId);
       if (!room) {
@@ -121,7 +153,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
       }
       callTimeouts.delete(call.roomId);
-    }, 30000); // 30 seconds
+    }, 30000);
 
     callTimeouts.set(call.roomId, timeout);
   }
@@ -135,7 +167,6 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: CallResponseDto,
     @ConnectedSocket() client: Socket,
   ) {
-    // Timeout clear করো
     const timeout = callTimeouts.get(dto.roomId);
     if (timeout) {
       clearTimeout(timeout);
@@ -143,12 +174,9 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     if (!dto.accept) {
-      // Reject করলে
       await this.webrtcService.rejectCall(dto.roomId);
-
-      // Caller কে জানাও
       const call = await this.webrtcService.endCall(dto.roomId);
-      const callerSocketId = connectedUsers.get(call?.callerId);
+      const callerSocketId = this.socketService.getSocketId(call?.callerId);
       if (callerSocketId) {
         this.server.to(callerSocketId).emit('call-rejected', {
           roomId: dto.roomId,
@@ -157,13 +185,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    // Accept করলে
     await this.webrtcService.acceptCall(dto.roomId);
     activeRooms.set(dto.roomId, []);
 
-    // Caller কে জানাও call accepted
     const callData = await this.webrtcService.acceptCall(dto.roomId);
-    const callerSocketId = connectedUsers.get(callData?.callerId);
+    const callerSocketId = this.socketService.getSocketId(callData?.callerId);
 
     if (callerSocketId) {
       this.server.to(callerSocketId).emit('call-accepted', {
@@ -187,10 +213,9 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SignalDto,
     @ConnectedSocket() client: Socket,
   ) {
-    // Room valid কিনা check করো
-    const userId = [...connectedUsers.entries()].find(
-      ([, socketId]) => socketId === client.id,
-    )?.[0];
+    const userId = this.socketService
+      .getConnectedUsers()
+      .find((id) => this.socketService.getSocketId(id) === client.id);
 
     if (!userId) {
       client.emit('call-error', { message: 'User not found' });
@@ -203,14 +228,12 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    // Room এ socket add করো
     const room = activeRooms.get(dto.roomId) || [];
     if (!room.includes(client.id)) {
       room.push(client.id);
       activeRooms.set(dto.roomId, room);
     }
 
-    // Receiver এর কাছে offer পাঠাও
     this.server.to(dto.targetId).emit('receive-offer', {
       offer: dto.offer,
       roomId: dto.roomId,
@@ -223,14 +246,12 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SignalDto,
     @ConnectedSocket() client: Socket,
   ) {
-    // Room এ socket add করো
     const room = activeRooms.get(dto.roomId) || [];
     if (!room.includes(client.id)) {
       room.push(client.id);
       activeRooms.set(dto.roomId, room);
     }
 
-    // Caller এর কাছে answer পাঠাও
     this.server.to(dto.targetId).emit('receive-answer', {
       answer: dto.answer,
       roomId: dto.roomId,
@@ -247,7 +268,6 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: IceCandidateDto,
     @ConnectedSocket() client: Socket,
   ) {
-    // অন্যজনের কাছে ICE candidate পাঠাও
     this.server.to(dto.targetId).emit('ice-candidate', {
       candidate: dto.candidate,
       roomId: dto.roomId,
@@ -266,7 +286,6 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     await this.webrtcService.endCall(data.roomId);
 
-    // Room এর অন্যজনকে জানাও
     const participants = activeRooms.get(data.roomId) || [];
     const otherSocketId = participants.find((id) => id !== client.id);
 
@@ -279,5 +298,38 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     activeRooms.delete(data.roomId);
     client.emit('call-ended', { roomId: data.roomId });
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PHASE: MESSAGING
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  @SubscribeMessage('send-message')
+  async handleSendMessage(
+    @MessageBody() dto: { receiverId: string; content: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const senderId = this.socketService
+      .getConnectedUsers()
+      .find((id) => this.socketService.getSocketId(id) === client.id);
+
+    if (!senderId) {
+      client.emit('message-error', { message: 'Sender not found' });
+      return;
+    }
+
+    const message = await this.messagesService.sendMessage(senderId, {
+      content: dto.content,
+      receiverId: dto.receiverId,
+    });
+
+    // Emit to sender
+    client.emit('new-message', message);
+
+    // Emit to receiver if online
+    const receiverSocketId = this.socketService.getSocketId(dto.receiverId);
+    if (receiverSocketId) {
+      this.server.to(receiverSocketId).emit('new-message', message);
+    }
   }
 }

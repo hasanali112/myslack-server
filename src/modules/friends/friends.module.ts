@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { FriendsController } from './friends.controller';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { WebrtcModule } from '../webrtc/webrtc.module';
 
 @Module({
+  imports: [forwardRef(() => WebrtcModule)],
   controllers: [FriendsController],
-  providers: [FriendsService, PrismaService],
+  providers: [FriendsService],
 })
 export class FriendsModule {}

@@ -44,6 +44,22 @@ export class UsersService {
     return users;
   }
 
+  async getAllUsers(currentUserId: string) {
+    return this.prismaService.user.findMany({
+      where: { user_id: { not: currentUserId } },
+      select: {
+        user_id: true,
+        username: true,
+        fullName: true,
+        avatar: true,
+        status: true,
+        bio: true,
+        role: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getUserProfileByUsername(username: string) {
     return this.prismaService.user.findUnique({
       where: { username },
@@ -80,13 +96,17 @@ export class UsersService {
     });
   }
 
-  async updateCurrentUser(currentUserId: string, payload: {
-    fullName?: string | null;
-    role?: string | null;
-    bio?: string | null;
-    phone?: string | null;
-    location?: string | null;
-  }) {
+  async updateCurrentUser(
+    currentUserId: string,
+    payload: {
+      fullName?: string | null;
+      role?: string | null;
+      bio?: string | null;
+      phone?: string | null;
+      location?: string | null;
+      avatar?: string | null;
+    },
+  ) {
     return this.prismaService.user.update({
       where: { user_id: currentUserId },
       data: payload,

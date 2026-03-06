@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { WebrtcService } from './webrtc.service';
-import { WebrtcGateway } from './webrtc.getway';
-import { PrismaModule } from 'src/prisma/prisma.module';
+import { AppGateway } from './app.gateway';
+import { SocketService } from './socket.service';
+import { MessagesModule } from '../messages/messages.module';
 
 @Module({
-  imports: [PrismaModule],
-  providers: [WebrtcService, WebrtcGateway],
-  exports: [WebrtcService],
+  imports: [forwardRef(() => MessagesModule)],
+  providers: [WebrtcService, AppGateway, SocketService],
+  exports: [WebrtcService, SocketService],
 })
 export class WebrtcModule {}

@@ -40,12 +40,12 @@ model User {
 }
 
 model RefreshToken {
-  refresh_token_id String   @id @default(uuid())
+  refresh_token_id String    @id @default(uuid())
   user_id          String
-  tokenHash        String   @unique
+  tokenHash        String    @unique
   expiresAt        DateTime
   revokedAt        DateTime?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -96,7 +96,7 @@ model Channel {
   name           String          @unique
   description    String?
   type           ChannelType     @default(PUBLIC)
-  workspace_id   String
+  workspace_id   String?
   isDM           Boolean         @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -122,14 +122,14 @@ model ChannelMember {
 }
 
 model Message {
-  message_id String   @id @default(uuid())
-  content    String   @db.Text
+  message_id String        @id @default(uuid())
+  content    String        @db.Text
   sender_id  String
   channel_id String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  sender     User     @relation(fields: [sender_id], references: [user_id], onDelete: Cascade)
-  channel    Channel  @relation(fields: [channel_id], references: [channel_id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  sender     User          @relation(fields: [sender_id], references: [user_id], onDelete: Cascade)
+  channel    Channel       @relation(fields: [channel_id], references: [channel_id], onDelete: Cascade)
   reads      MessageRead[]
 
   @@map("messages")

@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
+import { CloudinaryService } from './cloudinary.service';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -16,7 +29,25 @@ import { SkipThrottle } from '@nestjs/throttler';
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
+
+  @Post('avatar')
+  @ApiOperation({ summary: 'Update user avatar' })
+  @UseInterceptors(FileInterceptor('file'))
+  @ResponseMessage('Avatar updated successfully')
+  async uploadAvatar(
+    @Request() req,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const currentUserId = req.user.sub;
+    const uploadResult = await this.cloudinaryService.uploadFile(file);
+    return this.usersService.updateCurrentUser(currentUserId, {
+      avatar: uploadResult.secure_url,
+    });
+  }
 
   @Get('search')
   @ApiOperation({ summary: 'Search for users by name or username' })
@@ -26,6 +57,16 @@ export class UsersController {
   async searchUsers(@Query('q') q: string, @Request() req) {
     const currentUserId = req.user.sub;
     return this.usersService.searchUsers(q, currentUserId);
+  }
+
+  @Get('all')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Get all registered users except current user' })
+  @ApiResponse({ status: 200, description: 'Returns all users' })
+  @ResponseMessage('Users fetched successfully')
+  async getAllUsers(@Request() req) {
+    const currentUserId = req.user.sub;
+    return this.usersService.getAllUsers(currentUserId);
   }
 
   @Get('me')

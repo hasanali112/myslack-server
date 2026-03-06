@@ -134,6 +134,11 @@ export class AppGateway
 
     const call = await this.webrtcService.createCall(callerId, dto.receiverId);
 
+    // Track participants immediately for this room
+    const participants = [client.id, receiverSocketId];
+    roomUsers.set(call.roomId, participants);
+    activeRooms.set(call.roomId, participants);
+
     client.emit('call-initiated', {
       roomId: call.roomId,
       receiver: call.receiver,
@@ -219,6 +224,26 @@ export class AppGateway
         peerSocketId: callerSocketId,
       });
     }
+  }
+
+  @SubscribeMessage('reject-call')
+  async handleRejectCall(
+    @MessageBody() data: { roomId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const callData = await this.webrtcService.getCall(data.roomId);
+    if (callData) {
+      const callerSocketId = this.socketService.getSocketId(callData.callerId);
+      if (callerSocketId) {
+        this.server.to(callerSocketId).emit('call-rejected', {
+          roomId: data.roomId,
+        });
+      }
+    }
+    await this.webrtcService.rejectCall(data.roomId);
+    await this.webrtcService.endCall(data.roomId);
+    activeRooms.delete(data.roomId);
+    roomUsers.delete(data.roomId);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

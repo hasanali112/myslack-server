@@ -98,13 +98,15 @@ export class AuthController {
       httpOnly: false,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
 
     return result;
@@ -201,13 +203,15 @@ export class AuthController {
       httpOnly: false, // Set to false if you want frontend to read it (like in proxy.ts), but usually it's true for security. Given your proxy.ts reads it, let's keep it accessible or adjust proxy.
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
 
     return result;
@@ -231,13 +235,15 @@ export class AuthController {
       httpOnly: false, // keeping false so frontend middleware/proxy can read it from request.cookies.get
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
 
     return result;
@@ -256,13 +262,15 @@ export class AuthController {
       httpOnly: false,
       path: '/',
       expires: new Date(0),
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
     res.cookie('refresh_token', '', {
       httpOnly: true,
       path: '/',
       expires: new Date(0),
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
 
     return { message: 'Logout successful' };
@@ -285,13 +293,15 @@ export class AuthController {
       httpOnly: false,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
     });
 
     return result;

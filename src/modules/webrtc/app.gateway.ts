@@ -321,6 +321,23 @@ export class AppGateway
     });
   }
 
+  @SubscribeMessage('call-mode-change')
+  handleCallModeChange(
+    @MessageBody()
+    data: { roomId: string; type: 'audio' | 'video'; enabled: boolean },
+    @ConnectedSocket() client: Socket,
+  ) {
+    // Relay to the other participant in the room
+    const participants = roomUsers.get(data.roomId) || [];
+    const otherSocketId = participants.find((id) => id !== client.id);
+    if (otherSocketId) {
+      this.server.to(otherSocketId).emit('call-mode-change', {
+        type: data.type,
+        enabled: data.enabled,
+      });
+    }
+  }
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // PHASE 5: CALL END
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

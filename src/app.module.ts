@@ -13,6 +13,8 @@ import { CorsMiddleware } from './common/middleware/cors.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { WorkSpaceModule } from './modules/work-space/work-space.module';
 import { WebrtcModule } from './modules/webrtc/webrtc.module';
+import { UsersModule } from './modules/users/users.module';
+import { FriendsModule } from './modules/friends/friends.module';
 
 @Module({
   imports: [
@@ -26,9 +28,9 @@ import { WebrtcModule } from './modules/webrtc/webrtc.module';
       ],
     }),
     JwtModule.registerAsync({
+      global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        global: true,
         secret: config.get<string>('JWT_ACCESS_SECRET'),
         signOptions: {
           expiresIn: config.get<string>('JWT_ACCESS_EXPIRE_IN'),
@@ -38,6 +40,8 @@ import { WebrtcModule } from './modules/webrtc/webrtc.module';
     AuthModule,
     WorkSpaceModule,
     WebrtcModule,
+    UsersModule,
+    FriendsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -159,8 +159,6 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Accept করলে
     await this.webrtcService.acceptCall(dto.roomId);
-
-    // Room এ দুইজনকে add করো
     activeRooms.set(dto.roomId, []);
 
     // Caller কে জানাও call accepted
@@ -170,12 +168,10 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (callerSocketId) {
       this.server.to(callerSocketId).emit('call-accepted', {
         roomId: dto.roomId,
-        // Caller এখন Offer তৈরি করবে
         shouldCreateOffer: true,
       });
     }
 
-    // Receiver কে বলো offer এর জন্য wait করো
     client.emit('call-accepted', {
       roomId: dto.roomId,
       shouldCreateOffer: false,

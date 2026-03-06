@@ -6,6 +6,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  });
+
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -27,7 +32,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
   console.log('[Nest] Swagger documentation built successfully');
-  const port = process.env.PORT ?? 3000;
+  const port = process.env.PORT ?? 8000;
   await app.listen(port);
 
   console.log(`MySlack Server is running on: http://localhost:${port}`);

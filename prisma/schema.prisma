@@ -9,21 +9,26 @@ datasource db {
 }
 
 model User {
-  user_id          String            @id @default(uuid())
-  email            String            @unique
-  password         String
-  username         String            @unique
-  fullName         String?
-  avatar           String?
-  status           UserStatus        @default(OFFLINE)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  messages         Message[]
-  channelMembers   ChannelMember[]
-  workspaceMembers WorkspaceMember[]
-  verifications    Verification[]
-  callsAsCaller    Call[]           @relation("CallCaller")
-  callsAsReceiver  Call[]           @relation("CallReceiver")
+  user_id                String            @id @default(uuid())
+  email                  String            @unique
+  password               String
+  username               String            @unique
+  fullName               String?
+  avatar                 String?
+  status                 UserStatus        @default(OFFLINE)
+  isVerified             Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  messages               Message[]
+  channelMembers         ChannelMember[]
+  workspaceMembers       WorkspaceMember[]
+  verifications          Verification[]
+  callsAsCaller          Call[]            @relation("CallCaller")
+  callsAsReceiver        Call[]            @relation("CallReceiver")
+  sentFriendRequests     FriendRequest[]   @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[]   @relation("ReceivedFriendRequests")
+  friendships            Friendship[]      @relation("UserFriendships")
+  friendOf               Friendship[]      @relation("FriendUserFriendships")
 
   @@map("users")
 }
@@ -126,6 +131,34 @@ model Call {
   @@map("calls")
 }
 
+model FriendRequest {
+  id         String              @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  sender   User @relation("SentFriendRequests", fields: [senderId], references: [user_id], onDelete: Cascade)
+  receiver User @relation("ReceivedFriendRequests", fields: [receiverId], references: [user_id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@map("friend_requests")
+}
+
+model Friendship {
+  id        String   @id @default(uuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+
+  user   User @relation("UserFriendships", fields: [userId], references: [user_id], onDelete: Cascade)
+  friend User @relation("FriendUserFriendships", fields: [friendId], references: [user_id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@map("friendships")
+}
+
 // Enums
 enum CallStatus {
   PENDING
@@ -148,4 +181,10 @@ enum ChannelType {
 enum Role {
   ADMIN
   MEMBER
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
 }

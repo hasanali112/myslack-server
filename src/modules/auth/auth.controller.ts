@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { ResponseMessage } from 'src/common/decorators/response-message.decorator';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -6,11 +7,13 @@ import { ApiBody, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from 'src/common/decorators/public.decorator';
 
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { LoginUserDto } from './dto/login-user.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Public()
   @Post('register')
@@ -23,10 +26,10 @@ export class AuthController {
       user: {
         value: {
           email: 'user@example.com',
-          password: 'password123'
-        }
-      }
-    }
+          password: 'password123',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 201,
@@ -36,10 +39,10 @@ export class AuthController {
       properties: {
         message: {
           type: 'string',
-          example: 'Please check your email for verification'
-        }
-      }
-    }
+          example: 'Please check your email for verification',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -51,11 +54,14 @@ export class AuthController {
         message: {
           type: 'array',
           items: { type: 'string' },
-          example: ['email must be an email', 'password must be longer than or equal to 6 characters']
+          example: [
+            'email must be an email',
+            'password must be longer than or equal to 6 characters',
+          ],
         },
-        error: { type: 'string', example: 'Bad Request' }
-      }
-    }
+        error: { type: 'string', example: 'Bad Request' },
+      },
+    },
   })
   @ApiResponse({
     status: 409,
@@ -65,11 +71,11 @@ export class AuthController {
       properties: {
         statusCode: { type: 'number', example: 409 },
         message: { type: 'string', example: 'Email already exists' },
-        error: { type: 'string', example: 'Conflict' }
-      }
-    }
+        error: { type: 'string', example: 'Conflict' },
+      },
+    },
   })
-  @ResponseMessage("Please check your email for verification")
+  @ResponseMessage('Please check your email for verification')
   async registerUser(@Body() registerUserDto: RegisterUserDto) {
     return this.authService.registerUser(registerUserDto);
   }
@@ -84,10 +90,10 @@ export class AuthController {
     examples: {
       user: {
         value: {
-          email: 'user@example.com'
-        }
-      }
-    }
+          email: 'user@example.com',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 200,
@@ -97,10 +103,10 @@ export class AuthController {
       properties: {
         message: {
           type: 'string',
-          example: 'Verification email sent successfully'
-        }
-      }
-    }
+          example: 'Verification email sent successfully',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 404, // Changed to 404 for User Not Found documentation
@@ -110,12 +116,88 @@ export class AuthController {
       properties: {
         statusCode: { type: 'number', example: 404 },
         message: { type: 'string', example: 'User not found' },
-        error: { type: 'string', example: 'Not Found' }
-      }
-    }
+        error: { type: 'string', example: 'Not Found' },
+      },
+    },
   })
-  @ResponseMessage("Verification email sent successfully")
-  async resendVerification(@Body() resendVerificationDto: ResendVerificationDto) {
+  @ResponseMessage('Verification email sent successfully')
+  async resendVerification(
+    @Body() resendVerificationDto: ResendVerificationDto,
+  ) {
     return this.authService.resendVerification(resendVerificationDto.email);
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify user email' })
+  @ApiBody({
+    type: VerifyEmailDto,
+    description: 'Email verification token',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Email verified successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Email verified successfully' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invalid or expired token',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 404 },
+        message: {
+          type: 'string',
+          example: 'Invalid or expired verification token',
+        },
+        error: { type: 'string', example: 'Not Found' },
+      },
+    },
+  })
+  @ResponseMessage('Email verified successfully')
+  async verifyEmail(
+    @Body() verifyEmailDto: VerifyEmailDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.verifyEmail(verifyEmailDto.token);
+
+    res.cookie('auth_token', result.access_token, {
+      httpOnly: false, // Set to false if you want frontend to read it (like in proxy.ts), but usually it's true for security. Given your proxy.ts reads it, let's keep it accessible or adjust proxy.
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax',
+    });
+
+    return result;
+  }
+
+  @Public()
+  @Post('login')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Login user' })
+  @ApiBody({ type: LoginUserDto })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ResponseMessage('Login successful')
+  async login(
+    @Body() loginUserDto: LoginUserDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.loginUser(loginUserDto);
+
+    res.cookie('auth_token', result.access_token, {
+      httpOnly: false, // keeping false so frontend middleware/proxy can read it from request.cookies.get
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax',
+    });
+
+    return result;
   }
 }

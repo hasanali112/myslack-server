@@ -136,11 +136,13 @@ export class AppGateway
     client.emit('call-initiated', {
       roomId: call.roomId,
       receiver: call.receiver,
+      video: dto.video,
     });
 
     this.server.to(receiverSocketId).emit('incoming-call', {
       roomId: call.roomId,
       caller: call.caller,
+      video: dto.video,
     });
 
     const timeout = setTimeout(async () => {
@@ -186,22 +188,36 @@ export class AppGateway
     }
 
     await this.webrtcService.acceptCall(dto.roomId);
-    activeRooms.set(dto.roomId, []);
 
-    const callData = await this.webrtcService.acceptCall(dto.roomId);
-    const callerSocketId = this.socketService.getSocketId(callData?.callerId);
+    const callData = await this.webrtcService.getCall(dto.roomId);
+    if (!callData) return;
 
-    if (callerSocketId) {
+    const callerSocketId = this.socketService.getSocketId(callData.callerId);
+    const receiverSocketId = this.socketService.getSocketId(
+      callData.receiverId,
+    );
+
+    // Track participants for this room
+    const participants: string[] = [];
+    if (callerSocketId) participants.push(callerSocketId);
+    if (receiverSocketId) participants.push(receiverSocketId);
+    roomUsers.set(dto.roomId, participants);
+    activeRooms.set(dto.roomId, participants);
+
+    if (callerSocketId && receiverSocketId) {
       this.server.to(callerSocketId).emit('call-accepted', {
         roomId: dto.roomId,
         shouldCreateOffer: true,
+        peerSocketId: receiverSocketId,
+        video: callData.status === 'ACCEPTED', // We should ideally have the video flag in DB or pass it through
+      });
+
+      this.server.to(receiverSocketId).emit('call-accepted', {
+        roomId: dto.roomId,
+        shouldCreateOffer: false,
+        peerSocketId: callerSocketId,
       });
     }
-
-    client.emit('call-accepted', {
-      roomId: dto.roomId,
-      shouldCreateOffer: false,
-    });
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -228,9 +244,11 @@ export class AppGateway
       return;
     }
 
-    const room = activeRooms.get(dto.roomId) || [];
+    // Sync roomUsers and activeRooms
+    const room = roomUsers.get(dto.roomId) || [];
     if (!room.includes(client.id)) {
       room.push(client.id);
+      roomUsers.set(dto.roomId, room);
       activeRooms.set(dto.roomId, room);
     }
 
@@ -246,9 +264,11 @@ export class AppGateway
     @MessageBody() dto: SignalDto,
     @ConnectedSocket() client: Socket,
   ) {
-    const room = activeRooms.get(dto.roomId) || [];
+    // Sync roomUsers and activeRooms
+    const room = roomUsers.get(dto.roomId) || [];
     if (!room.includes(client.id)) {
       room.push(client.id);
+      roomUsers.set(dto.roomId, room);
       activeRooms.set(dto.roomId, room);
     }
 

@@ -1,5 +1,6 @@
 export class InitiateCallDto {
   receiverId: string;
+  video: boolean;
 }
 
 export class SignalDto {

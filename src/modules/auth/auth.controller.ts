@@ -1,10 +1,11 @@
-import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { ResponseMessage } from 'src/common/decorators/response-message.decorator';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { ApiBody, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from 'src/common/decorators/public.decorator';
+import type { Request } from 'express';
 
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -14,6 +15,17 @@ import { LoginUserDto } from './dto/login-user.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  private getCookie(req: Request, name: string) {
+    if (req.cookies?.[name]) return req.cookies[name];
+    const raw = req.headers?.cookie;
+    if (!raw) return undefined;
+    const match = raw
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${name}=`));
+    return match ? decodeURIComponent(match.split('=')[1]) : undefined;
+  }
 
   @Public()
   @Post('register')
@@ -173,6 +185,12 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       sameSite: 'lax',
     });
+    res.cookie('refresh_token', result.refresh_token, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+    });
 
     return result;
   }
@@ -195,6 +213,63 @@ export class AuthController {
       httpOnly: false, // keeping false so frontend middleware/proxy can read it from request.cookies.get
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax',
+    });
+    res.cookie('refresh_token', result.refresh_token, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+    });
+
+    return result;
+  }
+
+  @Public()
+  @Post('logout')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Logout user' })
+  @ApiResponse({ status: 200, description: 'Logout successful' })
+  @ResponseMessage('Logout successful')
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = this.getCookie(req, 'refresh_token');
+    await this.authService.revokeRefreshToken(refreshToken);
+    res.cookie('auth_token', '', {
+      httpOnly: false,
+      path: '/',
+      expires: new Date(0),
+      sameSite: 'lax',
+    });
+    res.cookie('refresh_token', '', {
+      httpOnly: true,
+      path: '/',
+      expires: new Date(0),
+      sameSite: 'lax',
+    });
+
+    return { message: 'Logout successful' };
+  }
+
+  @Public()
+  @Post('refresh')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({ status: 200, description: 'Access token refreshed' })
+  @ResponseMessage('Access token refreshed')
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = this.getCookie(req, 'refresh_token');
+    const result = await this.authService.refreshAccessToken(refreshToken);
+
+    res.cookie('auth_token', result.access_token, {
+      httpOnly: false,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+    });
+    res.cookie('refresh_token', result.refresh_token, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'lax',
     });
 

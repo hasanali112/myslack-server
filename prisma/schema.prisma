@@ -14,6 +14,10 @@ model User {
   password               String
   username               String            @unique
   fullName               String?
+  bio                    String?
+  role                   String?
+  phone                  String?
+  location               String?
   avatar                 String?
   status                 UserStatus        @default(OFFLINE)
   isVerified             Boolean           @default(false)
@@ -29,8 +33,24 @@ model User {
   receivedFriendRequests FriendRequest[]   @relation("ReceivedFriendRequests")
   friendships            Friendship[]      @relation("UserFriendships")
   friendOf               Friendship[]      @relation("FriendUserFriendships")
+  refreshTokens          RefreshToken[]
+  messageReads           MessageRead[]
 
   @@map("users")
+}
+
+model RefreshToken {
+  refresh_token_id String   @id @default(uuid())
+  user_id          String
+  tokenHash        String   @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("refresh_tokens")
 }
 
 model Verification {
@@ -110,6 +130,7 @@ model Message {
   updatedAt  DateTime @updatedAt
   sender     User     @relation(fields: [sender_id], references: [user_id], onDelete: Cascade)
   channel    Channel  @relation(fields: [channel_id], references: [channel_id], onDelete: Cascade)
+  reads      MessageRead[]
 
   @@map("messages")
 }
@@ -157,6 +178,20 @@ model Friendship {
 
   @@unique([userId, friendId])
   @@map("friendships")
+}
+
+model MessageRead {
+  message_read_id String   @id @default(uuid())
+  user_id         String
+  message_id      String
+  readAt          DateTime @default(now())
+
+  user    User    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  message Message @relation(fields: [message_id], references: [message_id], onDelete: Cascade)
+
+  @@unique([user_id, message_id])
+  @@index([user_id])
+  @@map("message_reads")
 }
 
 // Enums

@@ -14,6 +14,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { CreateFriendRequestDto } from './dto/create-friend-request.dto';
 import { ResponseMessage } from 'src/common/decorators/response-message.decorator';
 
@@ -32,6 +33,7 @@ export class FriendsController {
   }
 
   @Get('requests/pending')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Get pending incoming friend requests' })
   @ApiResponse({
     status: 200,
@@ -43,6 +45,7 @@ export class FriendsController {
   }
 
   @Get('requests/sent')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Get sent friend requests' })
   @ApiResponse({ status: 200, description: 'Returns list of sent requests' })
   @ResponseMessage('Sent friend requests fetched')
@@ -75,6 +78,7 @@ export class FriendsController {
   }
 
   @Get()
+  @SkipThrottle()
   @ApiOperation({ summary: 'Get the friends list' })
   @ApiResponse({ status: 200, description: "Returns the user's friends" })
   @ResponseMessage('Friends list fetched')

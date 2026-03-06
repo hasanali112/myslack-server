@@ -9,6 +9,7 @@ import { EmailService } from 'src/common/utils/email/email.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from 'src/prisma/prisma.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +28,60 @@ export class AuthService {
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15)
     );
+  }
+
+  private generateRefreshToken() {
+    return crypto.randomBytes(64).toString('hex');
+  }
+
+  private hashToken(token: string) {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private async issueRefreshToken(userId: string) {
+    const rawToken = this.generateRefreshToken();
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await this.prismaService.refreshToken.create({
+      data: {
+        user_id: userId,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    return rawToken;
+  }
+
+  private async rotateRefreshToken(rawToken?: string) {
+    if (!rawToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const tokenHash = this.hashToken(rawToken);
+    const existing = await this.prismaService.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!existing || existing.revokedAt || existing.expiresAt < new Date()) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    await this.prismaService.refreshToken.update({
+      where: { tokenHash },
+      data: { revokedAt: new Date() },
+    });
+
+    return this.issueRefreshToken(existing.user_id);
+  }
+
+  async revokeRefreshToken(rawToken?: string) {
+    if (!rawToken) return;
+    const tokenHash = this.hashToken(rawToken);
+    await this.prismaService.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   private async generateUniqueUsername(email: string): Promise<string> {
@@ -162,9 +217,12 @@ export class AuthService {
       username: user.username,
     };
 
+    const refreshToken = await this.issueRefreshToken(user.user_id);
+
     return {
       message: 'Email verified successfully',
       access_token: await this.jwtService.signAsync(payload),
+      refresh_token: refreshToken,
       user: {
         user_id: user.user_id,
         email: user.email,
@@ -200,13 +258,41 @@ export class AuthService {
       username: user.username,
     };
 
+    const refreshToken = await this.issueRefreshToken(user.user_id);
+
     return {
       access_token: await this.jwtService.signAsync(payload),
+      refresh_token: refreshToken,
       user: {
         user_id: user.user_id,
         email: user.email,
         username: user.username,
       },
+    };
+  }
+
+  async refreshAccessToken(rawToken: string) {
+    const newRefreshToken = await this.rotateRefreshToken(rawToken);
+    const tokenHash = this.hashToken(newRefreshToken);
+    const tokenRecord = await this.prismaService.refreshToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = tokenRecord.user;
+    const payload = {
+      sub: user.user_id,
+      email: user.email,
+      username: user.username,
+    };
+
+    return {
+      access_token: await this.jwtService.signAsync(payload),
+      refresh_token: newRefreshToken,
     };
   }
 }

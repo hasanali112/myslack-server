@@ -33,9 +33,9 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
   console.log('[Nest] Swagger documentation built successfully');
   const port = process.env.PORT ?? 8000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`MySlack Server is running on: http://localhost:${port}`);
-  console.log(`Swagger is running on: http://localhost:${port}/docs`);
+  console.log(`MySlack Server is running on: http://0.0.0.0:${port}`);
+  console.log(`Swagger is running on: http://0.0.0.0:${port}/docs`);
 }
 bootstrap();

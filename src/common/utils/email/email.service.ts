@@ -11,8 +11,8 @@ export class EmailService {
     // Initialize nodemailer transporter with ConfigService
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      port: 587,
+      secure: false, // true for 465, false for other ports
       auth: {
         user: this.configService.get<string>('EMAIL_USER'),
         pass: this.configService.get<string>('EMAIL_PASS'),
@@ -21,7 +21,7 @@ export class EmailService {
   }
 
   async sendVerificationEmail(email: string, token: string) {
-    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/verify-account?token=${token}`;
+    const verificationLink = `${process.env.FRONTEND_URL || 'https://my-lark.onrender.com'}/auth/verify-account?token=${token}`;
 
     const htmlTemplate = getVerificationEmailTemplate(token, verificationLink);
 
@@ -29,8 +29,11 @@ export class EmailService {
   }
 
   private async sendMail(to: string, subject: string, html: string) {
+    const from =
+      this.configService.get<string>('EMAIL_FROM') ||
+      'MySlack <clientandcontenthub@gmail.com>';
     const mailOptions = {
-      from: 'MySlack <clientandcontenthub@gmail.com>',
+      from,
       to,
       subject,
       html,

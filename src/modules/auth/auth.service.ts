@@ -123,24 +123,30 @@ export class AuthService {
           password: hashedPassword,
           username,
           fullName,
+          isVerified: true, // Auto-verify the user
         },
       });
 
-      const verification = await prisma.verification.create({
-        data: {
-          user_id: user.user_id,
-          token: verificationToken,
-        },
-      });
-
-      return { user, verification };
+      return { user };
     });
 
-    // Send verification email
-    await this.emailService.sendVerificationEmail(email, verificationToken);
+    const payload = {
+      sub: result.user.user_id,
+      email: result.user.email,
+      username: result.user.username,
+    };
+
+    const refreshToken = await this.issueRefreshToken(result.user.user_id);
 
     return {
-      message: 'Please check your email for verification',
+      message: 'Registration successful',
+      access_token: await this.jwtService.signAsync(payload),
+      refresh_token: refreshToken,
+      user: {
+        user_id: result.user.user_id,
+        email: result.user.email,
+        username: result.user.username,
+      },
     };
   }
 

@@ -87,9 +87,27 @@ export class AuthController {
       },
     },
   })
-  @ResponseMessage('Please check your email for verification')
-  async registerUser(@Body() registerUserDto: RegisterUserDto) {
-    return this.authService.registerUser(registerUserDto);
+  @ResponseMessage('Registration successful')
+  async registerUser(
+    @Body() registerUserDto: RegisterUserDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.registerUser(registerUserDto);
+
+    res.cookie('auth_token', result.access_token, {
+      httpOnly: false,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+    });
+    res.cookie('refresh_token', result.refresh_token, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+    });
+
+    return result;
   }
 
   @Public()
@@ -256,7 +274,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Access token refreshed' })
   @ResponseMessage('Access token refreshed')
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const refreshToken = this.getCookie(req, 'refresh_token');
     const result = await this.authService.refreshAccessToken(refreshToken);
 

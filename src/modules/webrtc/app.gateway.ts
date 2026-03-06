@@ -26,7 +26,8 @@ const activeRooms = new Map<string, any>();
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: ['http://localhost:3000', 'https://my-lark.onrender.com'],
+    credentials: true,
   },
   namespace: '/app',
 })

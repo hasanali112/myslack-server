@@ -10,25 +10,38 @@ import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
 import { AuthGuard } from './common/guards/auth.guard';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { CorsMiddleware } from './common/middleware/cors.middleware';
+import { AuthModule } from './modules/auth/auth.module';
+import { WorkSpaceModule } from './modules/work-space/work-space.module';
+import { WebrtcModule } from './modules/webrtc/webrtc.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }), ThrottlerModule.forRoot({
-    throttlers: [
-      {
-        ttl: 60000,
-        limit: 10,
-      },
-    ],
-  }), JwtModule.registerAsync({
-    inject: [ConfigService],
-    useFactory: (config: ConfigService) => ({
-      global: true,
-      secret: config.get<string>('JWT_ACCESS_SECRET'),
-      signOptions: { expiresIn: config.get<string>('JWT_ACCESS_EXPIRE_IN') } as JwtSignOptions,
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 10,
+        },
+      ],
     }),
-  })],
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        global: true,
+        secret: config.get<string>('JWT_ACCESS_SECRET'),
+        signOptions: {
+          expiresIn: config.get<string>('JWT_ACCESS_EXPIRE_IN'),
+        } as JwtSignOptions,
+      }),
+    }),
+    AuthModule,
+    WorkSpaceModule,
+    WebrtcModule,
+  ],
   controllers: [AppController],
-  providers: [AppService,
+  providers: [
+    AppService,
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
@@ -52,13 +65,11 @@ import { CorsMiddleware } from './common/middleware/cors.middleware';
     {
       provide: APP_GUARD,
       useClass: AuthGuard,
-    }
+    },
   ],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(CorsMiddleware, LoggerMiddleware)
-      .forRoutes('*');
+    consumer.apply(CorsMiddleware, LoggerMiddleware).forRoutes('*');
   }
 }

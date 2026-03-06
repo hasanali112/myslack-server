@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Account</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+            padding: 20px;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: #ffffff;
+        }
+        
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+        
+        .email-body {
+            padding: 40px 30px;
+        }
+        
+        h1 {
+            color: #333333;
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        p {
+            color: #666666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .verification-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 16px 40px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .verification-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .token-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+        
+        .token-label {
+            color: #333333;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .token-value {
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+        
+        .divider {
+            height: 1px;
+            background-color: #e1e8ed;
+            margin: 30px 0;
+        }
+        
+        .info-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            margin: 0;
+            color: #856404;
+            font-size: 14px;
+        }
+        
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #999999;
+            font-size: 14px;
+        }
+        
+        .email-footer p {
+            color: #999999;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .social-links {
+            margin-top: 20px;
+        }
+        
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        @media only screen and (max-width: 600px) {
+            .email-body {
+                padding: 30px 20px;
+            }
+            
+            .email-header {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .verification-button {
+                padding: 14px 30px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <div class="logo">MySlack</div>
+            <p style="margin: 0; opacity: 0.9;">Welcome to the team!</p>
+        </div>
+        
+        <div class="email-body">
+            <h1>Verify Your Email Address</h1>
+            
+            <p>Hello there! 👋</p>
+            
+            <p>Thank you for signing up with MySlack! We're excited to have you on board. To get started, please verify your email address by clicking the button below.</p>
+            
+            <div class="button-container">
+                <a href="{{verificationLink}}" class="verification-button">Verify My Account</a>
+            </div>
+            
+            <div class="token-box">
+                <div class="token-label">Or use this verification code:</div>
+                <div class="token-value">{{token}}</div>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>⏰ Important:</strong> This verification link will expire in 24 hours for security reasons.</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p>If you didn't create an account with MySlack, you can safely ignore this email.</p>
+            
+            <p style="margin-top: 30px;">
+                <strong>Need help?</strong><br>
+                If you're having trouble with the button above, copy and paste the following URL into your web browser:
+            </p>
+            
+            <p style="word-break: break-all; color: #667eea; font-size: 14px;">
+                {{verificationLink}}
+            </p>
+        </div>
+        
+        <div class="email-footer">
+            <p><strong>MySlack</strong></p>
+            <p>Your team collaboration platform</p>
+            <p style="margin-top: 15px; font-size: 12px;">
+                © 2026 MySlack. All rights reserved.
+            </p>
+            <p style="font-size: 12px; margin-top: 10px;">
+                This is an automated email, please do not reply.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
